@@ -1,0 +1,92 @@
+{
+ "corum": {
+  "n_features": 2813,
+  "n_unmapped": 0,
+  "unmapped_fraction": 0.0,
+  "n_with_edges": 1147,
+  "n_edges": 18255
+ },
+ "complexportal": {
+  "n_features": 2813,
+  "n_unmapped": 0,
+  "unmapped_fraction": 0.0,
+  "n_with_edges": 847,
+  "n_edges": 4671
+ },
+ "string_exp": {
+  "n_features": 2813,
+  "n_unmapped": 0,
+  "unmapped_fraction": 0.0,
+  "n_with_edges": 2282,
+  "n_edges": 20688
+ },
+ "string": {
+  "n_features": 2813,
+  "n_unmapped": 0,
+  "unmapped_fraction": 0.0,
+  "n_with_edges": 2634,
+  "n_edges": 39815
+ },
+ "_dataset": {
+  "n_cells": 215,
+  "n_proteins": 2813,
+  "missing_fraction": 0.406628692366835,
+  "n_in_complex": 1545,
+  "cell_types": {
+   "CD38_neg": 54,
+   "CD38_pos": 54,
+   "prog": 54,
+   "LSC": 53
+  }
+ },
+ "_nulls": {
+  "corum": [
+   182550,
+   182550,
+   182550,
+   182550,
+   182550,
+   182550,
+   182550,
+   182550,
+   182550,
+   182550
+  ],
+  "complexportal": [
+   46710,
+   46710,
+   46710,
+   46710,
+   46710,
+   46710,
+   46710,
+   46710,
+   46710,
+   46710
+  ],
+  "string_exp": [
+   206880,
+   206880,
+   206880,
+   206880,
+   206880,
+   206880,
+   206880,
+   206880,
+   206880,
+   206880
+  ],
+  "string": [
+   398150,
+   398150,
+   398150,
+   398150,
+   398150,
+   398150,
+   398150,
+   398150,
+   398150,
+   398150
+  ]
+ }
+}

@@ -57,8 +57,25 @@ Everything from identical-rule removal to the final filter is `EvaluateRules` fr
 ## Output
 `python benchmarks/run.py --include-contrib` writes `results/contrib/panel.json` with
 `nifty:<prior>` rows for k = 25, 50, 100 (R² of ridge prediction of the non-panel proteins, all /
-in-complex / not-in-complex strata), plus the panels themselves under `panels`. See the PR for the
-run that accompanies this slot and the numbers next to `hvp`, `random_mean` and the priors.
+in-complex / not-in-complex strata), plus the panels themselves under `panels`.
+
+Run committed with this slot (`results/contrib/`, Petrosius 2023, 1007 candidates, 506,521 rules,
+code commit `abb3170`, NIFty commit `da3db09`), "all" stratum, panel R²:
+
+| k | nifty | hvp | random (mean of 10) | complexportal | complexportal null (mean of 10) | string_exp |
+|---|---|---|---|---|---|---|
+| 25 | 0.479 | 0.228 | 0.450 | 0.231 | 0.286 | 0.385 |
+| 50 | 0.432 | 0.189 | 0.419 | 0.193 | 0.380 | 0.403 |
+| 100 | 0.296 | 0.236 | 0.248 | 0.230 | 0.269 | 0.283 |
+
+The `nifty:*` rows are identical across priors (the graph is ignored). NIFty's panel is above
+`random_mean` at every k (by 0.03, 0.01 and 0.05) and above every prior-propagated panel; the same
+order holds in the in-complex and not-in-complex strata. The `--quick` run gives identical `nifty`
+values (the selection uses no benchmark seed). Caveat before reading this as "NIFty wins": NIFty
+sees the cell-type labels and the evaluation is label-free ridge R² over four cell types, so proteins
+that separate types predict the rest well by construction; the comparison with the other panels is
+fair in the sense that they could not use labels, not in the sense of equal information. Selection
+time was about 20–25 s per k on a laptop-class container.
 
 ## Limits
 - Needs labels; unsupervised datasets cannot use it. Labels are *used for selection*, so the

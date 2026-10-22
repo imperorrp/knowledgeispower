@@ -1,0 +1,32 @@
+{
+ "hvp": 0.7866932032186269,
+ "random_mean": 0.7668035042363862,
+ "corum": 0.7397221217873392,
+ "corum__null_mean": 0.7755355806473125,
+ "corum__null_range": [
+  0.7470838036875772,
+  0.8043271901030522
+ ],
+ "complexportal": 0.7677938775703425,
+ "complexportal__null_mean": 0.7907070792592831,
+ "complexportal__null_range": [
+  0.7666617785883841,
+  0.8147488649826269
+ ],
+ "string_exp": 0.8334672617598177,
+ "string_exp__null_mean": 0.7973347694499408,
+ "string_exp__null_range": [
+  0.7762453708042072,
+  0.81861571527966
+ ],
+ "string": 0.8331033781033781,
+ "string__null_mean": 0.8260405186613273,
+ "string__null_range": [
+  0.7999106880174841,
+  0.8421558929675014
+ ],
+ "all_proteins_detected_ge_50pct": 0.864844213113569,
+ "k": 50,
+ "ceiling_flag": false,
+ "note": "Sanity check only; not evidence for the claim."
+}
