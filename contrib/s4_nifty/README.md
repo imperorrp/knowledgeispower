@@ -20,9 +20,17 @@ NIFty is not on PyPI; its modules are top-level files in the repository. Nothing
 git clone https://github.com/PayneLab/nifty /path/to/nifty          # commit da3db09 (2026-05-06) was used here
 export NIFTY_PATH=/path/to/nifty                                     # or put that dir on sys.path
 pip install statsmodels cloudpickle                                  # NIFty's own deps not already in this env
-pytest -q tests/contrib/test_s4_nifty.py                             # 9 tests; 6 skip without NIFTY_PATH
+pytest -q tests/contrib/test_s4_nifty.py                             # 14 tests; 6 need NIFty and skip without it
 python benchmarks/run.py --include-contrib                           # -> results/contrib/panel.json, rows "nifty:<prior>"
+python contrib/s4_nifty/dev_panel_compare.py                         # dev seeds 100-102, next to coverage panels
 ```
+Without NIFty (as in CI), 8 tests still run. They replace NIFty's rule ranking with a transparent
+stand-in and check the wrapper's own logic. With NIFty, the other 6 also check the real method,
+including that our rule ranking equals NIFty's own `run_rule_evaluator` output.
+
+Quick check: `python benchmarks/run.py --include-contrib --quick` refuses to run, because
+`--include-contrib` defaults its output to `results/contrib/` and `--quick` may not write under
+`results/`. Add `--out benchmarks/_quick_out/contrib`.
 If NIFty cannot be imported, `contrib.s4_nifty.AVAILABLE` is `False`, nothing is registered, and the
 benchmark and tests run exactly as before (the contrib tests skip with a message).
 
@@ -68,18 +76,46 @@ code commit `abb3170`, NIFty commit `da3db09`), "all" stratum, panel R²:
 | 50 | 0.432 | 0.189 | 0.419 | 0.193 | 0.380 | 0.403 |
 | 100 | 0.296 | 0.236 | 0.248 | 0.230 | 0.269 | 0.283 |
 
-The `nifty:*` rows are identical across priors (the graph is ignored). NIFty's panel is above
-`random_mean` at every k (by 0.03, 0.01 and 0.05) and above every prior-propagated panel; the same
-order holds in the in-complex and not-in-complex strata. The `--quick` run gives identical `nifty`
-values (the selection uses no benchmark seed). Caveat before reading this as "NIFty wins": NIFty
-sees the cell-type labels and the evaluation is label-free ridge R² over four cell types, so proteins
-that separate types predict the rest well by construction; the comparison with the other panels is
-fair in the sense that they could not use labels, not in the sense of equal information. Selection
-time was about 20–25 s per k on a laptop-class container.
+The `nifty:*` rows are identical across priors (the graph is ignored). In this run NIFty's panel is
+above `random_mean` at every k (by 0.03, 0.01 and 0.05) and above every prior-propagated
+(`soft_weight`) panel, in all three strata. `run.py` stores only the *mean* of the random panels,
+so this table alone cannot say whether those margins exceed random-panel spread; the dev comparison
+below can. The `--quick` run gives identical `nifty` values (selection uses no benchmark seed).
+Selection took 20–26 s per k in this container.
+
+### Dev comparison next to coverage panels (`dev_panel_compare.py`, CV seeds 100–102)
+The S4 track note in `docs/SLOTS.md` asks for NIFty "next to random and coverage panels", which live
+in the phase-2 panel harness (`benchmarks/explore_panel.py`), not in `run.py`. `dev_panel_compare.py`
+re-scores hvp, the 10 random panels and NIFty with that harness, checks that the re-scored hvp/random
+rows match the stored `results/phase2/dev/dev_panel.json` exactly, and merges in the stored coverage
+rows. Output: `dev_panel_means.csv`. Mean panel R² ("all" stratum) over the three dev CV seeds:
+
+| k | nifty | random mean (min–max of 10) | random panels ≥ nifty | cover_corum_W1 | cover_complexportal_W1 | cover_data_matched_corum_W1 | cover_data_matched_complexportal_W1 |
+|---|---|---|---|---|---|---|---|
+| 25 | 0.477 | 0.448 (0.411–0.470) | 0 of 10 | 0.452 | 0.447 | 0.487 | 0.472 |
+| 50 | 0.428 | 0.416 (0.402–0.434) | 1 of 10 | 0.406 | 0.402 | 0.449 | 0.427 |
+| 100 | 0.294 | 0.244 (0.197–0.261) | 0 of 10 | 0.261 | 0.237 | 0.292 | 0.294 |
+
+Reading (dev seeds, one dataset, no confirmation): NIFty beats every random panel at k = 25 and
+100, but at k = 50 it is inside the random range. It beats curated-complex coverage at every k.
+It is level with, not above, the **data-matched** coverage panels (coverage over a co-variation
+graph with the same edge count as the curated one): data-matched CORUM coverage is higher at k = 25
+and 50. So NIFty joins data-matched coverage as the strongest data-only panel bar, and a
+curated-knowledge panel would have to beat both. NIFty panels contain 0, 0 and 1 keratins at k = 25,
+50 and 100, without the W1 keratin filter.
+
+Caveat: NIFty uses the cell-type labels to choose proteins, and no other arm does. The score is
+label-free (ridge R² of the other proteins), but in a dataset of four sorted cell types, proteins
+that separate the types plausibly carry much of the shared variation. The comparison is fair in
+that the other arms *could not* use labels. It is not an equal-information comparison.
 
 ## Limits
-- Needs labels; unsupervised datasets cannot use it. Labels are *used for selection*, so the
-  classification sanity check in the benchmark is not an independent test of a NIFty panel.
+- Needs labels; unsupervised datasets cannot use it. `run.py`'s classification sanity check does
+  not score contrib panels; if it ever does, a NIFty panel would be circular there because labels
+  were used for selection.
+- Dev results above are exploratory (dev seeds, one dataset) and are not a claim. Per `AGENTS.md`
+  they should also be logged in `docs/EXPLORATION_LOG.md`, which is outside the contributor paths,
+  so this README is the log and the PR asks Amit to add a line.
 - Runtime scales with the number of candidate pairs (quadratic in candidates); NIFty's
   mutual-information filter is a Python loop over kept rules.
 - NIFty's p-values come from one shuffled-label draw per rule plus bucket pooling; they rank rules,

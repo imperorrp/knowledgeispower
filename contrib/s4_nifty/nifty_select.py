@@ -156,13 +156,14 @@ def _rank_rules(ev, bool_matrix: np.ndarray, pairs: list[tuple[str, str]], label
 # --------------------------------------------------------------------------- panel
 
 
-def _fingerprint(adata, k: int, seed: int) -> tuple:
+def _fingerprint(adata, k: int, seed: int, min_detection: float) -> tuple:
     X = np.ascontiguousarray(np.asarray(adata.X, dtype=float))
     h = hashlib.sha256()
     h.update(X.tobytes())
     h.update("\x00".join(map(str, adata.var_names)).encode())
-    h.update("\x00".join(map(str, adata.obs[LABEL_COLUMN].astype(str))).encode())
-    return (h.hexdigest(), int(k), int(seed))
+    if LABEL_COLUMN in adata.obs:
+        h.update("\x00".join(map(str, adata.obs[LABEL_COLUMN].astype(str))).encode())
+    return (h.hexdigest(), int(k), int(seed), float(min_detection))
 
 
 def _round_robin(lists: list[list]) -> list:
@@ -225,7 +226,7 @@ def _proteins_from(rules: list[tuple[str, str]], chosen: list[str], seen: set[st
 def select(adata, graph=None, k: int = 50, *, seed: int = DEFAULT_SEED, min_detection: float = MIN_DETECTION,
            log=print) -> list[str]:
     """``register_method`` interface: k var_names from NIFty's top rules. ``graph`` is ignored."""
-    key = _fingerprint(adata, k, seed)
+    key = _fingerprint(adata, k, seed, min_detection)
     if key in _cache:
         return list(_cache[key])
     chosen, seen = [], set()

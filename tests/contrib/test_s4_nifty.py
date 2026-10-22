@@ -128,9 +128,93 @@ def test_fills_when_rules_cannot_supply_k():
     assert s4.select(a, None, 10) == panel  # cannot exceed the candidate pool; never pads with non-candidates
 
 
-def test_missing_labels_raise_clearly():
+@needs_nifty
+def test_rule_ranking_matches_nifty_run_rule_evaluator(toy, tmp_path):
+    """Our _rank_rules + chunked vectoriser give NIFty's own top rules and p-values (same seed)."""
+    import pandas as pd
+    from itertools import combinations
+
+    a, _ = toy
+    sub = a[:, candidates(a)].copy()
+    y = np.where(sub.obs["cell_type"].astype(str).to_numpy() == "B", "B", "rest")
+    pairs = list(combinations(list(sub.var_names), 2))
+    nz = nifty_select._import_nifty()
+    cfg = {"k_rules": 5, "mutual_information": True, "mutual_information_cutoff": 0.7, "disjoint": False,
+           "output_dir": str(tmp_path)}
+    _, _, ref_top = nz["EvaluateRules"](3).run_rule_evaluator(
+        cfg, pairs, pd.DataFrame(np.asarray(sub.X, float), columns=list(sub.var_names)),
+        pd.DataFrame({"classification_label": y}))
+    bm = nifty_select.vectorize_pairs(np.asarray(sub.X, float), np.array(list(combinations(range(sub.n_vars), 2))))
+    _, our_top = nifty_select._rank_rules(nz["EvaluateRules"](3), bm, pairs, y, 5)
+    assert list(ref_top["Protein_Pair"]) == list(our_top["Gene_Pair"])  # NIFty renames the column on save
+    assert np.allclose(ref_top["P_Value"].to_numpy(float), our_top["P_Value"].to_numpy(float))
+
+
+# --------------------------------------------------------------------------- CI (no NIFty): panel assembly
+# NIFty is not installed in CI, so the tests above skip there. These run everywhere: they replace only
+# NIFty's rule ranking with a transparent stand-in and check the wrapper's own logic (candidate pool,
+# one-vs-rest, round-robin, top-up, k unique, determinism, graph independence).
+
+
+@pytest.fixture
+def fake_nifty(monkeypatch):
+    import pandas as pd
+
+    def fake_rank(ev, bool_matrix, pairs, labels, k_rules):
+        pos = labels == labels[0]
+        score = np.abs(bool_matrix[:, pos].mean(1) - bool_matrix[:, ~pos].mean(1))
+        order = np.lexsort((np.arange(len(pairs)), -score))  # best first, ties by pair order
+        summary = pd.DataFrame({"Gene_Pair": [pairs[i] for i in order], "True_Score": score[order],
+                                "P_Value": np.linspace(0, 1, len(order))})
+        return summary, summary.head(k_rules).copy()
+
+    monkeypatch.setattr(nifty_select, "_nifty", {"EvaluateRules": lambda seed: None,
+                                                 "DataTransformer": None, "file": nifty_select.Path(__file__)})
+    monkeypatch.setattr(nifty_select, "_rank_rules", fake_rank)
+    monkeypatch.setattr(nifty_select, "_cache", {})
+    return fake_rank
+
+
+def test_panel_assembly_k_unique_candidates(toy, fake_nifty):
+    a, g = toy
+    cand = set(np.array(a.var_names)[candidates(a)])
+    for k in (1, 4, 10, 25, 29):
+        panel = nifty_select.select(a, g, k, log=lambda *_: None)
+        assert len(panel) == k == len(set(panel))
+        assert set(panel) <= cand and "P29" not in panel
+
+
+def test_panel_assembly_deterministic_graph_independent(toy, fake_nifty):
+    a, g = toy
+    p1 = nifty_select.select(a, g, 10, log=lambda *_: None)
+    nifty_select._cache.clear()
+    p2 = nifty_select.select(a, None, 10, log=lambda *_: None)
+    assert p1 == p2
+
+
+def test_panel_assembly_round_robin_over_classes(toy, fake_nifty):
+    """Each class's best rule contributes before any class's second rule (k=6 -> 2 rules per class)."""
+    a, _ = toy
+    res = nifty_select.nifty_rules(a, 6, log=lambda *_: None)
+    assert res["classes"] == ["A", "B", "C"] and res["k_rules"] == 2
+    firsts = [res["top"][c]["Gene_Pair"].iloc[0] for c in res["classes"]]
+    panel = nifty_select.select(a, None, 6, log=lambda *_: None)
+    expected = []
+    for pair in firsts:
+        expected += [p for p in pair if p not in expected]
+    assert panel[:len(expected)] == expected[:6]
+
+
+def test_cache_key_includes_min_detection(toy, fake_nifty):
+    a, _ = toy
+    nifty_select.select(a, None, 5, log=lambda *_: None)
+    nifty_select.select(a, None, 5, min_detection=0.95, log=lambda *_: None)
+    assert len(nifty_select._cache) == 2
+
+
+def test_missing_labels_raise_clearly(fake_nifty):
     a = from_log2_matrix(np.ones((3, 3)), list("abc"), list("xyz"))
-    if not s4.AVAILABLE:
-        pytest.skip("NIFty not importable (set NIFTY_PATH)")
     with pytest.raises(ValueError, match="cell_type"):
         nifty_select.nifty_rules(a, 2)
+    with pytest.raises(ValueError, match="cell_type"):
+        nifty_select.select(a, None, 2)
